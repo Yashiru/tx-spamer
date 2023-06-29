@@ -1,16 +1,12 @@
-use ethers::{
-    core::types::TransactionRequest,
-    middleware::SignerMiddleware,
-    providers::{Middleware, Provider, Ws},
-    signers::{LocalWallet, Signer},
-    types::Bytes,
-};
-use eyre::Result;
 use futures::future::join_all;
 use std::fs;
+use web3::types::Bytes;
+use ethereum_tx_sign::LegacyTransaction;
+use ethereum_tx_sign::Transaction;
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+#[tokio::main]
+async fn main() -> web3::Result<()> {
     /* -------------------------------------------------------------------------- */
     /*                              Read config file                              */
     /* -------------------------------------------------------------------------- */
@@ -33,58 +29,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get the calls values
     let value = json.get("value").expect("Config should have 'value' key");
 
+    // Get the private key to use
+    let private_key = json
+        .get("privateKey")
+        .expect("Config should have 'privateKey' key");
+
     // Get the amount of transaction to send
     let tx_amount = json
         .get("txAmount")
         .expect("Config should have 'txAmount' key");
 
-    // Get the signer private key
-    let private_key = json
-        .get("privateKey")
-        .expect("Config should have 'privateKey' key");
-
     // Get the RPC url
     let rpc_url = json.get("rpcUrl").expect("Config should have 'rpcUrl' key");
 
-    /* -------------------------------------------------------------------------- */
-    /*                               Setup provider                               */
-    /* -------------------------------------------------------------------------- */
+    let transport = web3::transports::Http::new(rpc_url.as_str().unwrap())?;
+    let web3 = web3::Web3::new(transport);
 
-    // Create a wallet from a private key
-    let wallet: LocalWallet = private_key
-        .as_str()
-        .unwrap()
-        .parse::<LocalWallet>()
-        .unwrap();
-
-    // Connect to the network
-    let provider = Provider::<Ws>::connect(rpc_url.as_str().unwrap()).await?;
-
-    // Connect the wallet to the provider
-    let client = SignerMiddleware::new(provider, wallet.with_chain_id(1 as u64));
-
-    /* -------------------------------------------------------------------------- */
-    /*                              Send transactions                             */
-    /* -------------------------------------------------------------------------- */
+    let accounts = web3.eth().accounts().await?;
 
     // Craft the transaction
-    let mut decoded = [0; 228]; // length of a swapExactETHForTokens calldatas
-    hex::decode_to_slice(calldata.as_str().unwrap(), &mut decoded).expect("Decoding failed");
-    let tx = TransactionRequest::new()
-        .to(to.as_str().unwrap())
-        .data(Bytes::from(decoded))
-        .value(value.as_u64().unwrap());
+    let mut decodedCalldata = [0; 228]; // length of a swapExactETHForTokens calldatas
+    hex::decode_to_slice(calldata.as_str().unwrap(), &mut decodedCalldata).expect("Decoding failed");
+
+    let mut decodedTo = [0; 20]; // length of a swapExactETHForTokens calldatas
+    hex::decode_to_slice(to.as_str().unwrap(), &mut decodedTo).expect("Decoding failed");
+
+    let mut decodedPrivateKey = [0; 32]; // length of a swapExactETHForTokens calldatas
+    hex::decode_to_slice(private_key.as_str().unwrap(), &mut decodedPrivateKey).expect("Decoding failed");
+
+    let tx = LegacyTransaction {
+        chain: 1,
+        nonce: 0,
+        to: Some(decodedTo),
+        value: u128::from(value.as_u64().unwrap()),
+        gas_price: 100000,
+        gas: 300000000000000,
+        data: decodedCalldata.to_vec(),
+    };
 
     // Create a vector to hold all our pending futures.
     let mut pending_txs = Vec::new();
 
-    // Send the transactions
     for nonce in 0..tx_amount.as_u64().unwrap() {
-        let pendingTx = client.send_transaction(tx.clone().nonce(nonce), None);
-        pending_txs.push(pendingTx);
-    }
+        let mut _tx = tx.clone();
+        _tx.nonce = u128::from(nonce);
 
-    println!("Sending {} transactions", tx_amount.as_u64().unwrap());
+        let ecdsa = _tx.ecdsa(&decodedPrivateKey).unwrap();
+        let transaction_bytes = _tx.sign(&ecdsa);
+
+        let pending_tx = web3.eth().send_raw_transaction(Bytes::from(transaction_bytes));
+        pending_txs.push(pending_tx);
+    }
 
     // Wait for all transactions to be mined concurrently.
     let results = join_all(pending_txs).await;
@@ -92,10 +87,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Handle the results.
     for result in results {
         match result {
-            Ok(tx) => println!("Transaction mined with hash: {}", tx.tx_hash()),
+            Ok(tx_hash) => println!("Transaction mined with hash: {}", tx_hash),
             Err(e) => eprintln!("Error mining transaction: {}", e),
         }
     }
-
+    
     Ok(())
 }
