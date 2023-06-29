@@ -45,26 +45,24 @@ async fn main() -> web3::Result<()> {
     let transport = web3::transports::Http::new(rpc_url.as_str().unwrap())?;
     let web3 = web3::Web3::new(transport);
 
-    let accounts = web3.eth().accounts().await?;
-
     // Craft the transaction
-    let mut decodedCalldata = [0; 228]; // length of a swapExactETHForTokens calldatas
-    hex::decode_to_slice(calldata.as_str().unwrap(), &mut decodedCalldata).expect("Decoding failed");
+    let mut decoded_calldata = [0; 228]; // length of a swapExactETHForTokens calldatas
+    hex::decode_to_slice(calldata.as_str().unwrap(), &mut decoded_calldata).expect("Decoding failed");
 
-    let mut decodedTo = [0; 20]; // length of a swapExactETHForTokens calldatas
-    hex::decode_to_slice(to.as_str().unwrap(), &mut decodedTo).expect("Decoding failed");
+    let mut decoded_to = [0; 20]; // length of a swapExactETHForTokens calldatas
+    hex::decode_to_slice(to.as_str().unwrap(), &mut decoded_to).expect("Decoding failed");
 
-    let mut decodedPrivateKey = [0; 32]; // length of a swapExactETHForTokens calldatas
-    hex::decode_to_slice(private_key.as_str().unwrap(), &mut decodedPrivateKey).expect("Decoding failed");
+    let mut decoded_private_key = [0; 32]; // length of a swapExactETHForTokens calldatas
+    hex::decode_to_slice(private_key.as_str().unwrap(), &mut decoded_private_key).expect("Decoding failed");
 
     let tx = LegacyTransaction {
         chain: 1,
         nonce: 0,
-        to: Some(decodedTo),
+        to: Some(decoded_to),
         value: u128::from(value.as_u64().unwrap()),
-        gas_price: 100000,
-        gas: 300000000000000,
-        data: decodedCalldata.to_vec(),
+        gas_price: u128::from(tx_amount.as_u64().unwrap()) * 1000 + 1,
+        gas: 500000,
+        data: decoded_calldata.to_vec(),
     };
 
     // Create a vector to hold all our pending futures.
@@ -74,7 +72,12 @@ async fn main() -> web3::Result<()> {
         let mut _tx = tx.clone();
         _tx.nonce = u128::from(nonce);
 
-        let ecdsa = _tx.ecdsa(&decodedPrivateKey).unwrap();
+        _tx.gas_price = tx.gas_price - u128::from(nonce) * 1000;
+
+        // print gas price
+        println!("Gas price: {}", _tx.gas_price);
+
+        let ecdsa = _tx.ecdsa(&decoded_private_key).unwrap();
         let transaction_bytes = _tx.sign(&ecdsa);
 
         let pending_tx = web3.eth().send_raw_transaction(Bytes::from(transaction_bytes));
