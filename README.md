@@ -6,7 +6,33 @@
 
 ## Objective
 
-This tool is designed to facilitate the rapid dispatch of a high volume of identical transactions. While its application may seem unconventional, it proves advantageous under specific use cases.
+This tool is designed to facilitate the rapid dispatch of a high volume of identical transactions to an Anvil local Ethereum node. It can be used to test the event catch of a backend infrastructure, for example.
+
+## Setup
+
+### Anvil
+You must run a Anvil node as follow:
+
+```bash
+anvil \
+  --accounts 1 \
+  --balance 100000000 \
+  --fork-url <YOUR_FORK_URL> \
+  --order FIFO \
+  --gas-price 1
+```
+
+### Script configuration
+You can find the script configuration in `config.json`
+```json
+{
+  "to": "9a5...EA44", // The contract to call
+  "calldata": "afaf...1e1e", // The call datas
+  "value": 10, // The call value
+  "txAmount": 5000, // The amount of transaction to send
+  "rpcUrl": "ws://127.0.0.1:8545" // The WebSocket RPC url to send the transactions to
+}
+```
 
 ## Disclaimer
 
