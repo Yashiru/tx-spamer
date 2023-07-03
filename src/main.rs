@@ -5,8 +5,6 @@ use web3::{
     Web3, Transport,
 };
 use web3::transports::WebSocket;
-use web3::api::Eth;
-use web3::api::Namespace;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /* -------------------------------------------------------------------------- */
 
     /* ------------------------------- Parse JSON ------------------------------- */
-    let file = fs::File::open("transaction.config.json").expect("file should open read only");
+    let file = fs::File::open("config.json").expect("file should open read only");
     let json: serde_json::Value =
         serde_json::from_reader(file).expect("file should be proper JSON");
 
@@ -86,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pending_txs.push(pending_tx);
     }
 
-    println!("Sending {} transactions", tx_amount.as_u64().unwrap());
+    println!("Sending {} transactions...", tx_amount.as_u64().unwrap());
 
     // Wait for all transactions to be mined concurrently.
     let results = join_all(pending_txs).await;
