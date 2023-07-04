@@ -19,19 +19,52 @@ anvil \
   --balance 100000000 \
   --fork-url <YOUR_FORK_URL> \
   --order FIFO \
-  --gas-price 1
+  --gas-price 1 \
+  --no-mining
 ```
 
 ### Script configuration
 You can find the script configuration in `config.json`
-```json
+```javascript
 {
-  "to": "9a5...EA44", // The contract to call
-  "calldata": "afaf...1e1e", // The call datas
-  "value": 10, // The call value
-  "txAmount": 5000, // The amount of transaction to send
-  "rpcUrl": "ws://127.0.0.1:8545" // The WebSocket RPC url to send the transactions to
+  // The contract address to call (without 0x)
+  to: "9a5...EA44", 
+
+  // The call datas (without 0x)
+  calldata: "afaf...1e1e",
+
+  // The call value
+  value: 10,
+
+  // The total amount of transactions to send
+  txAmount: 5000,
+
+  // The transaction amount per mined block 
+  txPerBlock: 1000,
+
+  // An additional pause between each block (Keep in mind that the block mining itself take some time)
+  blockMiningMsPause: 0,
+  
+  // The WebSocket RPC url to send the transactions to
+  rpcUrl: "ws://127.0.0.1:8545" 
 }
+```
+
+### Run the script
+
+**Install Rust**
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Setup up script configuration**
+```bash
+cp ./configs/<CONFIG_YOU_WANT>.json ./config.json
+```
+
+**Run script with cargo**
+```bash
+cargo run
 ```
 
 ## Disclaimer
