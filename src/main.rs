@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("╔══════════════════════════════════════════════════════════════════════════╗");
     println!(
-        "   Sending \x1b[35m{} transactions\x1b[0m with \x1b[36m{} tx per blocks\x1b[0m\n",
+        "   Sending \x1b[35m{} transactions\x1b[0m with \x1b[36m{} tx per blocks\x1b[0m",
         tx_amount,
         tx_per_block,
     );
