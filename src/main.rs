@@ -54,9 +54,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("╔══════════════════════════════════════════════════════════════════════════╗");
     println!(
-        "   Sending \x1b[35m{} transactions\x1b[0m with \x1b[36m{} tx per blocks\x1b[0m\n   With \x1b[33m{} ms\x1b[0m additonal pause between each blocks.",
+        "   Sending \x1b[35m{} transactions\x1b[0m with \x1b[36m{} tx per blocks\x1b[0m\n",
         tx_amount,
         tx_per_block,
+    );
+    println!(
+        "   With \x1b[33m{} ms\x1b[0m additonal pause between each blocks",
         block_mining_ms_pause
     );
     println!("╚══════════════════════════════════════════════════════════════════════════╝\n");
