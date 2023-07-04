@@ -27,14 +27,25 @@ anvil \
 You can find the script configuration in `config.json`
 ```javascript
 {
-  // The contract address to call (without 0x)
-  to: "9a5...EA44", 
+  // The transactions to be sent
+  transactions: [
+    {
+      // The contract address to call (without 0x)
+      to: "9a5...EA44", 
 
-  // The call datas (without 0x)
-  calldata: "afaf...1e1e",
+      // The call datas (without 0x)
+      calldata: "afaf...1e1e",
 
-  // The call value
-  value: 10,
+      // The call value
+      value: 10,
+    },
+    {
+      ...
+    },
+    {
+      ...
+    }
+  ]
 
   // The total amount of transactions to send
   txAmount: 5000,
@@ -66,6 +77,9 @@ cp ./configs/<CONFIG_YOU_WANT>.json ./config.json
 ```bash
 cargo run
 ```
+
+> **Note** 
+> During runtime, transactions will be dispatched sequentially, following the order specified in the `transactions` array of the configuration file.
 
 ## Disclaimer
 
