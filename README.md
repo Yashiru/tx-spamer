@@ -27,6 +27,18 @@ anvil \
 You can find the script configuration in `config.json`
 ```javascript
 {
+  // The total amount of transactions to send
+  txAmount: 5000,
+
+  // The transaction amount per mined block 
+  txPerBlock: 1000,
+
+  // An additional pause between each block (Keep in mind that the block mining itself take some time)
+  blockMiningMsPause: 0,
+  
+  // The WebSocket RPC url to send the transactions to
+  rpcUrl: "ws://127.0.0.1:8545" 
+  
   // The transactions to be sent
   transactions: [
     {
@@ -46,18 +58,6 @@ You can find the script configuration in `config.json`
       ...
     }
   ]
-
-  // The total amount of transactions to send
-  txAmount: 5000,
-
-  // The transaction amount per mined block 
-  txPerBlock: 1000,
-
-  // An additional pause between each block (Keep in mind that the block mining itself take some time)
-  blockMiningMsPause: 0,
-  
-  // The WebSocket RPC url to send the transactions to
-  rpcUrl: "ws://127.0.0.1:8545" 
 }
 ```
 

@@ -32,13 +32,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "╚══════════════════════════════════════════════════════════════════════════╝\n";
 
     let transactions_info = format!(
-        "   Sending {} with {}",
+        "  Sending {} with {}",
         format!("{} transactions", config.tx_amount).magenta(),
         format!("{} tx per blocks", config.tx_per_block).cyan()
     );
 
     let pause_info = format!(
-        "   With {} additional pause between each blocks",
+        "  With {} additional pause between each blocks",
         format!("{} ms", config.block_mining_ms_pause).yellow()
     );
 
