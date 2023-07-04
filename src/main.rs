@@ -5,10 +5,9 @@ use colored::*;
 use futures::future::join_all;
 use serde_json::Value;
 use std::fs::File;
-use std::str::FromStr;
 use web3::transports::WebSocket;
 use web3::{
-    types::{Address, TransactionRequest, U256},
+    types::{TransactionRequest, U256},
     Transport, Web3,
 };
 
@@ -66,11 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /*                          Setup transactions calls                          */
     /* -------------------------------------------------------------------------- */
 
-    // Prepare the transaction
-    let data = hex::decode(config.calldata).expect("Failed to decode calldata");
-    let to = Address::from_str(&config.to).expect("Failed to decode address");
-    let value = U256::from(config.value);
-
     // Create a vector to hold all pending futures.
     let mut pending_block_txs = Vec::new();
 
@@ -90,7 +84,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut succeeded_txs = 0;
     let mut failed_txs = 0;
 
-    for nonce in 0..config.tx_amount {
+    let mut nonce = 0;
+    for _ in 0..config.tx_amount / config.transactions.len() as u64 {
         // If we have reached the tx_per_block limit, mine a block and wait block_mining_ms_pause
         if nonce % config.tx_per_block == 0 && nonce != 0 {
             let result =
@@ -108,19 +103,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             pending_block_txs = Vec::new();
         }
 
-        // Craft the transaction
-        let tx_request = TransactionRequest {
-            from: my_account,
-            to: Some(to),
-            value: Some(value),
-            data: Some(web3::types::Bytes(data.clone())),
-            nonce: Some(U256::from(nonce)),
-            ..Default::default()
-        };
-
-        // Send the transaction and add it to the pending_block_txs vector
-        let pending_tx = web3.eth().send_transaction(tx_request);
-        pending_block_txs.push(pending_tx);
+        for i in 0..config.transactions.len() {
+            // Craft the transaction
+            let tx_request = TransactionRequest {
+                from: my_account,
+                to: Some(config.transactions[i].to),
+                value: Some(config.transactions[i].value),
+                data: Some(web3::types::Bytes(config.transactions[i].calldata.clone())),
+                nonce: Some(U256::from(nonce)),
+                ..Default::default()
+            };
+    
+            // Send the transaction and add it to the pending_block_txs vector
+            let pending_tx = web3.eth().send_transaction(tx_request);
+            pending_block_txs.push(pending_tx);
+            
+            // Increment nonce
+            nonce += 1;
+        }
     }
 
     // Mine the last block
