@@ -1,5 +1,11 @@
+mod utils {
+    pub mod config;
+}
+use colored::*;
 use futures::future::join_all;
-use std::fs;
+use serde_json::Value;
+use std::fs::File;
+use std::str::FromStr;
 use web3::transports::WebSocket;
 use web3::{
     types::{Address, TransactionRequest, U256},
@@ -12,110 +18,83 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /*                              Read config file                              */
     /* -------------------------------------------------------------------------- */
 
-    /* ------------------------------- Parse JSON ------------------------------- */
-    let file = fs::File::open("config.json").expect("file should open read only");
-    let json: serde_json::Value =
-        serde_json::from_reader(file).expect("file should be proper JSON");
-
-    /* ------------------------------- Get config ------------------------------- */
-
-    // Get the contract address to the transaction to
-    let to = json.get("to").expect("Config should have 'to' key");
-
-    // Get the calls datas
-    let calldata = json
-        .get("calldata")
-        .expect("Config should have 'calldata' key");
-
-    // Get the calls values
-    let value = json.get("value").expect("Config should have 'value' key");
-
-    // Get the amount of transaction to send
-    let tx_amount = json
-        .get("txAmount")
-        .expect("Config should have 'txAmount' key");
-
-    // Get the amount of transaction to send per block
-    let tx_per_block = json
-        .get("txPerBlock")
-        .expect("Config should have 'txPerBlock' key");
-
-    // Get the the amount of time to wait between each block
-    let block_mining_ms_pause = json
-        .get("blockMiningMsPause")
-        .expect("Config should have 'blockMiningMsPause' key");
-
-    // Get the RPC url
-    let rpc_url = json.get("rpcUrl").expect("Config should have 'rpcUrl' key");
+    let json_file = File::open("config.json").unwrap_or_else(|_| panic!("Unable to open file"));
+    let json_value: Value =
+        serde_json::from_reader(json_file).unwrap_or_else(|_| panic!("Invalid JSON format"));
+    let config = utils::config::Config::from_json(&json_value);
 
     /* -------------------------------------------------------------------------- */
     /*                            Start script message                            */
     /* -------------------------------------------------------------------------- */
 
-    println!("╔══════════════════════════════════════════════════════════════════════════╗");
-    println!(
-        "   Sending \x1b[35m{} transactions\x1b[0m with \x1b[36m{} tx per blocks\x1b[0m",
-        tx_amount,
-        tx_per_block,
+    let border_line =
+        "╔══════════════════════════════════════════════════════════════════════════╗";
+    let footer_line =
+        "╚══════════════════════════════════════════════════════════════════════════╝\n";
+
+    let transactions_info = format!(
+        "   Sending {} with {}",
+        format!("{} transactions", config.tx_amount).magenta(),
+        format!("{} tx per blocks", config.tx_per_block).cyan()
     );
-    println!(
-        "   With \x1b[33m{} ms\x1b[0m additonal pause between each blocks",
-        block_mining_ms_pause
+
+    let pause_info = format!(
+        "   With {} additional pause between each blocks",
+        format!("{} ms", config.block_mining_ms_pause).yellow()
     );
-    println!("╚══════════════════════════════════════════════════════════════════════════╝\n");
+
+    println!("{}", border_line);
+    println!("{}", transactions_info);
+    println!("{}", pause_info);
+    println!("{}", footer_line);
 
     /* -------------------------------------------------------------------------- */
     /*                               Setup provider                               */
     /* -------------------------------------------------------------------------- */
 
     // Connect to the network
-    let transport = WebSocket::new(rpc_url.as_str().unwrap()).await?;
-    let web3 = Web3::new(transport);
-
-    let mut accounts = web3.eth().accounts().await?;
-    let my_account = match accounts.pop() {
-        Some(account) => account,
-        None => panic!("No accounts available"),
-    };
+    let web3 = Web3::new(WebSocket::new(config.rpc_url.as_str()).await?);
+    // Get the signer
+    let my_account = web3
+        .eth()
+        .accounts()
+        .await?
+        .pop()
+        .expect("No accounts available");
 
     /* -------------------------------------------------------------------------- */
     /*                          Setup transactions calls                          */
     /* -------------------------------------------------------------------------- */
 
-    // Craft the transaction
-    let data = hex::decode(calldata.as_str().unwrap()).expect("Decoding failed");
-    let value = U256::from(value.as_u64().unwrap());
-    let to = Address::from_slice(&hex::decode(to.as_str().unwrap()).expect("Decoding failed"));
+    // Prepare the transaction
+    let data = hex::decode(config.calldata).expect("Failed to decode calldata");
+    let to = Address::from_str(&config.to).expect("Failed to decode address");
+    let value = U256::from(config.value);
 
-    // Create a vector to hold all our pending futures.
+    // Create a vector to hold all pending futures.
     let mut pending_block_txs = Vec::new();
 
-    // Set the signer nonce to 0 to allow nonce "prediction"
+    // Initialize nonce as 0 for nonce "prediction"
+    let parameters = vec![serde_json::to_value(&my_account)?, serde_json::to_value(0)?];
     web3.transport()
-        .execute(
-            "anvil_setNonce",
-            vec![serde_json::to_value(&my_account)?, serde_json::to_value(0)?],
-        )
+        .execute("anvil_setNonce", parameters)
         .await?;
-    println!("\x1b[32m✔\x1b[0m Nonce set to 0.");
 
-    // Declare transaction counters
-    let mut succeeded_txs = 0;
-    let mut failed_txs = 0;
+    println!("{} Nonce set to 0.", "✔".green());
 
     /* -------------------------------------------------------------------------- */
     /*                              Send transactions                             */
     /* -------------------------------------------------------------------------- */
 
-    for nonce in 0..tx_amount.as_u64().unwrap() {
+    // Declare transaction counters
+    let mut succeeded_txs = 0;
+    let mut failed_txs = 0;
+
+    for nonce in 0..config.tx_amount {
         // If we have reached the tx_per_block limit, mine a block and wait block_mining_ms_pause
-        if nonce % tx_per_block.as_u64().unwrap() == 0 && nonce != 0 {
-            let result = mine_and_wait(
-                &web3,
-                pending_block_txs,
-                block_mining_ms_pause.as_u64().unwrap(),
-            )
-            .await;
+        if nonce % config.tx_per_block == 0 && nonce != 0 {
+            let result =
+                mine_and_wait(&web3, pending_block_txs, config.block_mining_ms_pause).await;
 
             // Update transaction counters
             match result {
@@ -123,10 +102,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     succeeded_txs += succeeded;
                     failed_txs += failed;
                 }
-                Err(_) => println!("Error while mining block"),
+                Err(_) => println!("{}", "✖ Error while mining block".red()),
             }
 
-            // Reset the pending_block_txs vector
             pending_block_txs = Vec::new();
         }
 
@@ -146,12 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Mine the last block
-    let result = mine_and_wait(
-        &web3,
-        pending_block_txs,
-        block_mining_ms_pause.as_u64().unwrap(),
-    )
-    .await;
+    let result = mine_and_wait(&web3, pending_block_txs, config.block_mining_ms_pause).await;
 
     // Update transaction counters
     match result {
@@ -159,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             succeeded_txs += succeeded;
             failed_txs += failed;
         }
-        Err(_) => println!("Error while mining block"),
+        Err(_) => println!("{}", "✖ Error while mining block".red()),
     }
 
     /* -------------------------------------------------------------------------- */
@@ -169,17 +142,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print the succeded transaction result
     if succeeded_txs > 0 {
         println!(
-            "\n\x1b[32m✔\x1b[0m \x1b[35m{} transactions\x1b[0m has been sent in \x1b[36m{} blocks\x1b[0m with \x1b[33m{} ms\x1b[0m pause between each blocks.",
-            succeeded_txs,
-            tx_amount.as_u64().unwrap() / tx_per_block.as_u64().unwrap(),
-            block_mining_ms_pause.as_u64().unwrap()
+            "{} {} has been sent in {} with {} pause between each blocks.",
+            "✔".green(),
+            format!("{} transactions", succeeded_txs).magenta(),
+            format!("{} blocks", config.tx_amount / config.tx_per_block).cyan(),
+            format!("{} ms", config.block_mining_ms_pause).yellow()
         );
     }
 
     // Print the failed transaction result
     if failed_txs > 0 {
         println!(
-            "\x1b[31m✖\x1b[0m {} failed transactions (Mempool probably full, try empty it)",
+            "{} {} failed transactions (Mempool probably full, try empty it)",
+            "✖".red(),
             failed_txs
         );
     }
@@ -187,8 +162,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Mine a block, wait for the block to be mined and sleep for the specified amount 
-/// of time (config.block_mining_ms_pause).
+/// Asynchronously mine a block, pause for a configured duration, then return the durations of mining and pause.
+///
+/// # Arguments
+///
+/// * `web3` - Web3 instance connected via WebSocket.
+/// * `pending_txs` - Vector of pending Ethereum transactions.
+/// * `pause_ms` - Amount of pause time after block mining (in milliseconds).
+///
+/// # Return
+///
+/// Return a `Result` which, if Ok, contains a tuple of mining and pause durations in milliseconds (u64).
+/// If an error occurs, an Error Box is returned encapsulating the specific error.
 async fn mine_and_wait(
     web3: &Web3<WebSocket>,
     pending_txs: Vec<
@@ -204,34 +189,34 @@ async fn mine_and_wait(
     >,
     pause_ms: u64,
 ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
-    // Declare transaction counters
+    // Declare and initialize transaction counters
     let mut succeeded_txs = 0;
     let mut failed_txs = 0;
 
-    // Wait for the transaction to be indexed
+    // Wait for the transactions to be indexed
     let results = join_all(pending_txs).await;
 
-    // Update transaction counters
-    for result in results {
-        match result {
-            Ok(_) => succeeded_txs += 1,
-            Err(_) => failed_txs += 1,
-        }
-    }
+    // Count the number of successful and failed transactions
+    results.iter().for_each(|result| match result {
+        Ok(_) => succeeded_txs += 1,
+        Err(_) => failed_txs += 1,
+    });
 
-    // Mine a block
-    let result = web3
+    // Execute block mining
+    let mining_result = web3
         .transport()
         .execute("anvil_mine", vec![serde_json::to_value(1)?])
         .await;
 
-    // Print the result
-    match result {
-        Ok(_) => println!(
-            "👉 \x1b[32mBlock mined\x1b[0m with {} transactions",
+    // Handle mining result
+    if let Ok(_) = mining_result {
+        println!(
+            "👉 {} with {} transactions",
+            "Block mined".green(),
             succeeded_txs
-        ),
-        Err(_) => println!("👉 \x1b[32mBlock mining failed\\x1b[31m"),
+        );
+    } else {
+        println!("👉 {}", "Block mining failed".red());
     }
 
     // sleep for the specified amount of time
