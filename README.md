@@ -69,17 +69,49 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 **Setup up script configuration**
+1. Open the `config.json` file in your preferred text editor. You can use editors like vim, nano, or any GUI based text editor.
+
 ```bash
-cp ./configs/<CONFIG_YOU_WANT>.json ./config.json
+vim config.json
 ```
+
+2. Configure the following parameters:
+   - `txAmount`: The total amount of transactions you wish to send.
+
+   - `txPerBlock`: The amount of transactions per mined block.
+
+   - `blockMiningMsPause`: If you wish to have an additional pause after each block mining, specify it here (in milliseconds). Keep in mind that the block mining process itself takes some time.
+
+   - `rpcUrl`: This is the WebSocket RPC URL to which the transactions will be sent.
+
+   - `transactions`: Define the transactions you want to send in this array. For each transaction, provide the contract address (without 0x) in the `to` field, the call data (without 0x) in the `calldata` field, and the call value in the `value` field.
+
+Example:
+
+```javascript
+{
+  "txAmount": 5000,
+  "txPerBlock": 1000,
+  "blockMiningMsPause": 0,
+  "rpcUrl": "ws://127.0.0.1:8545",
+  "transactions": [
+    {
+      "to": "9a5...EA44",
+      "calldata": "afaf...1e1e",
+      "value": 10
+    }
+  ]
+}
+```
+
+> **Note**
+> The program processes transactions based on the transactions array in the config.json file. It starts from the first transaction in the array, sending them one by one to the Anvil node in their listed order. The loop continues until all transactions have been dispatched according to the `txAmount` field.
+
 
 **Run script with cargo**
 ```bash
 cargo run
 ```
-
-> **Note** 
-> During runtime, transactions will be dispatched sequentially, following the order specified in the `transactions` array of the configuration file.
 
 ## Disclaimer
 
