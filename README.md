@@ -68,14 +68,8 @@ You can find the script configuration in `config.json`
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-**Setup up script configuration**
-1. Open the `config.json` file in your preferred text editor. You can use editors like vim, nano, or any GUI based text editor.
-
-```bash
-vim config.json
-```
-
-2. Configure the following parameters:
+**Setup up script configuration**  
+You need to configure the following parameters:
    - `txAmount`: The total amount of transactions you wish to send.
 
    - `txPerBlock`: The amount of transactions per mined block.
