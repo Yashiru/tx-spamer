@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?
         .pop()
         .expect("No accounts available");
-
+ 
     /* -------------------------------------------------------------------------- */
     /*                          Setup transactions calls                          */
     /* -------------------------------------------------------------------------- */
@@ -87,7 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut nonce = 0;
     for _ in 0..config.tx_amount / config.transactions.len() as u64 {
         // If we have reached the tx_per_block limit, mine a block and wait block_mining_ms_pause
-        if nonce % config.tx_per_block == 0 && nonce != 0 {
+        if nonce % config.tx_per_block < config.transactions.len() as u64 && nonce != 0 {
             let result =
                 mine_and_wait(&web3, pending_block_txs, config.block_mining_ms_pause).await;
 
