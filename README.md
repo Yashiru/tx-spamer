@@ -6,7 +6,7 @@
 
 ## Objective
 
-This tool is designed to facilitate the rapid dispatch of a high volume of identical transactions to an Anvil local Ethereum node. It can be used to test the event catch of a backend infrastructure, for example.
+This tool is designed to streamline the process of quickly dispatching a substantial number of transactions to a local Anvil Ethereum node. It serves as a valuable asset for testing event capture capabilities within a backend infrastructure for example.
 
 ## Setup
 
