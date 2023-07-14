@@ -199,7 +199,10 @@ async fn mine_and_wait(
     // Count the number of successful and failed transactions
     results.iter().for_each(|result| match result {
         Ok(_) => succeeded_txs += 1,
-        Err(_) => failed_txs += 1,
+        Err(err) => {
+            println!("{} {:?}", "✖".red(), err);
+            failed_txs += 1
+        },
     });
 
     // Execute block mining
